@@ -230,6 +230,22 @@ fun FlightScreen(
             }
         }
 
+        // RC connection hint (shown briefly when no controller detected)
+        if (!gamepadState.connected && droneState.flightTimeSeconds < 5f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 4.dp)
+            ) {
+                Text(
+                    text = "Connect DJI RC / gamepad via USB or Bluetooth",
+                    color = DJIColors.TextMuted,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+
         // Back button
         Box(
             modifier = Modifier
