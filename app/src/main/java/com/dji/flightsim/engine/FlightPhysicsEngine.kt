@@ -63,20 +63,21 @@ class FlightPhysicsEngine {
     companion object {
         // Physical constants
         const val GRAVITY = 9.81f             // m/s²
-        const val AIR_DRAG = 0.3f             // drag coefficient
-        const val VERTICAL_DRAG = 0.5f        // vertical drag coefficient
-        const val MAX_THRUST = 20.0f          // max thrust acceleration (m/s²), > gravity for climb
-        const val HOVER_THRUST = GRAVITY      // thrust needed to hover
+        const val AIR_DRAG = 1.2f             // drag coefficient (increased for realistic deceleration)
+        const val VERTICAL_DRAG = 2.0f        // vertical drag coefficient
+        const val MAX_THRUST = 15.0f          // max thrust acceleration (m/s²)
 
         // Control response rates
-        const val MAX_VERTICAL_SPEED = 6.0f   // m/s (DJI Mini 3 Pro: 5m/s ascend)
-        const val MAX_HORIZONTAL_SPEED = 16.0f // m/s (DJI Mini 3 Pro: 16m/s)
-        const val MAX_YAW_RATE = 100.0f       // degrees/s
-        const val MAX_TILT_ANGLE = 35.0f      // degrees
+        const val MAX_VERTICAL_SPEED = 5.0f   // m/s (DJI Mini 3 Pro: 5m/s ascend)
+        const val MAX_DESCENT_SPEED = 3.0f    // m/s (descent is slower for safety)
+        const val MAX_HORIZONTAL_SPEED = 14.0f // m/s (DJI Mini 3 Pro: ~16m/s S mode)
+        const val MAX_YAW_RATE = 80.0f        // degrees/s (realistic yaw rate)
+        const val MAX_TILT_ANGLE = 25.0f      // degrees (reduced for smoother flight)
 
-        // Attitude response
-        const val TILT_RESPONSE = 5.0f        // how fast drone tilts to target (higher = snappier)
-        const val YAW_RESPONSE = 3.0f
+        // Attitude response (lower = more inertia, more realistic)
+        const val TILT_RESPONSE = 3.0f        // how fast drone tilts to target
+        const val TILT_RETURN_RATE = 4.0f     // how fast drone levels when stick released
+        const val YAW_DAMPING = 0.92f         // yaw momentum decay per frame
 
         // Battery
         const val BATTERY_DRAIN_HOVER = 0.04f  // %/s while hovering
@@ -86,51 +87,89 @@ class FlightPhysicsEngine {
         // Limits
         const val MAX_ALTITUDE = 120.0f       // meters (regulatory limit)
         const val MAX_DISTANCE = 500.0f       // meters from home
+
+        // Ground effect: near ground, extra lift and stability
+        const val GROUND_EFFECT_HEIGHT = 3.0f // meters
     }
 
     fun update(state: DroneState, input: ControlInput, deltaTime: Float): DroneState {
         if (!state.motorsRunning) {
+            // Motors off: drone falls with gravity if airborne
+            if (state.altitude > 0f) {
+                val newVz = state.vz - GRAVITY * deltaTime
+                val newAlt = (state.altitude + newVz * deltaTime).coerceAtLeast(0f)
+                return state.copy(
+                    altitude = newAlt,
+                    vz = if (newAlt <= 0f) 0f else newVz,
+                    batteryPercent = (state.batteryPercent - BATTERY_DRAIN_IDLE * deltaTime).coerceAtLeast(0f)
+                )
+            }
             return state.copy(
                 batteryPercent = (state.batteryPercent - BATTERY_DRAIN_IDLE * deltaTime).coerceAtLeast(0f)
             )
         }
 
-        // --- Attitude control ---
+        // --- Attitude control with inertia ---
+        // Smoothly tilt toward target, but return to level faster when stick released
         val targetPitch = input.pitch * MAX_TILT_ANGLE
         val targetRoll = input.roll * MAX_TILT_ANGLE
-        val newPitch = lerp(state.pitch, targetPitch, TILT_RESPONSE * deltaTime)
-        val newRoll = lerp(state.roll, targetRoll, TILT_RESPONSE * deltaTime)
+        val pitchRate = if (abs(input.pitch) > 0.05f) TILT_RESPONSE else TILT_RETURN_RATE
+        val rollRate = if (abs(input.roll) > 0.05f) TILT_RESPONSE else TILT_RETURN_RATE
+        val newPitch = lerp(state.pitch, targetPitch, pitchRate * deltaTime)
+        val newRoll = lerp(state.roll, targetRoll, rollRate * deltaTime)
 
-        // Yaw control
+        // Yaw control with momentum
         val yawDelta = input.yaw * MAX_YAW_RATE * deltaTime
         val newHeading = (state.heading + yawDelta + 360f) % 360f
 
-        // --- Thrust and movement ---
+        // --- Movement from tilt ---
         val headingRad = Math.toRadians(newHeading.toDouble()).toFloat()
         val pitchRad = Math.toRadians(newPitch.toDouble()).toFloat()
         val rollRad = Math.toRadians(newRoll.toDouble()).toFloat()
 
-        // Horizontal acceleration from tilt
-        val horizontalAccelFromPitch = MAX_THRUST * sin(pitchRad)
-        val horizontalAccelFromRoll = MAX_THRUST * sin(rollRad)
+        // Horizontal acceleration proportional to tilt angle
+        // Use sin(tilt) for realistic force decomposition
+        val accelMagnitudePitch = MAX_THRUST * sin(pitchRad)
+        val accelMagnitudeRoll = MAX_THRUST * sin(rollRad)
 
         // Decompose into world-space x,y using heading
-        val ax = horizontalAccelFromPitch * sin(headingRad) + horizontalAccelFromRoll * cos(headingRad)
-        val ay = horizontalAccelFromPitch * cos(headingRad) - horizontalAccelFromRoll * sin(headingRad)
+        val ax = accelMagnitudePitch * sin(headingRad) + accelMagnitudeRoll * cos(headingRad)
+        val ay = accelMagnitudePitch * cos(headingRad) - accelMagnitudeRoll * sin(headingRad)
 
-        // Vertical: throttle controls climb rate
-        val targetVz = input.throttle * MAX_VERTICAL_SPEED
-        val az = (targetVz - state.vz) * 3.0f // PD-like vertical speed control
+        // Vertical: throttle controls target climb rate with smooth transition
+        val targetVz = if (input.throttle > 0.05f) {
+            input.throttle * MAX_VERTICAL_SPEED
+        } else if (input.throttle < -0.05f) {
+            input.throttle * MAX_DESCENT_SPEED
+        } else {
+            0f // hover when stick centered
+        }
+        val vzError = targetVz - state.vz
+        val az = vzError * 4.0f // PD vertical speed controller
 
-        // Apply drag
-        val dragX = -state.vx * AIR_DRAG
-        val dragY = -state.vy * AIR_DRAG
+        // Speed-dependent drag (quadratic drag for realism)
+        val speed = sqrt(state.vx * state.vx + state.vy * state.vy)
+        val dragFactor = AIR_DRAG * (1f + speed * 0.05f) // increases with speed
+        val dragX = -state.vx * dragFactor
+        val dragY = -state.vy * dragFactor
         val dragZ = -state.vz * VERTICAL_DRAG
 
         // Integrate velocity
         var newVx = state.vx + (ax + dragX) * deltaTime
         var newVy = state.vy + (ay + dragY) * deltaTime
         var newVz = state.vz + (az + dragZ) * deltaTime
+
+        // When stick is released and drone is near hover, actively brake
+        if (abs(input.pitch) < 0.05f && abs(input.roll) < 0.05f) {
+            val brakeFactor = (1f - 3.0f * deltaTime).coerceAtLeast(0.9f)
+            newVx *= brakeFactor
+            newVy *= brakeFactor
+            // Stop micro-drift
+            if (sqrt(newVx * newVx + newVy * newVy) < 0.1f) {
+                newVx = 0f
+                newVy = 0f
+            }
+        }
 
         // Clamp horizontal speed
         val hSpeed = sqrt(newVx * newVx + newVy * newVy)
@@ -139,20 +178,27 @@ class FlightPhysicsEngine {
             newVx *= scale
             newVy *= scale
         }
-        newVz = newVz.coerceIn(-MAX_VERTICAL_SPEED, MAX_VERTICAL_SPEED)
+        newVz = newVz.coerceIn(-MAX_DESCENT_SPEED, MAX_VERTICAL_SPEED)
 
         // Integrate position
-        var newX = state.x + newVx * deltaTime
-        var newY = state.y + newVy * deltaTime
+        val newX = state.x + newVx * deltaTime
+        val newY = state.y + newVy * deltaTime
         var newAlt = state.altitude + newVz * deltaTime
+
+        // Ground effect: extra stability near ground
+        if (newAlt in 0f..GROUND_EFFECT_HEIGHT && newVz < 0f) {
+            // Cushion effect slows descent near ground
+            val groundFactor = newAlt / GROUND_EFFECT_HEIGHT
+            newVz *= (0.7f + 0.3f * groundFactor)
+        }
 
         // Ground collision
         if (newAlt <= 0f) {
             newAlt = 0f
-            newVz = 0f.coerceAtLeast(newVz)
-            // Friction on ground
-            newVx *= 0.9f
-            newVy *= 0.9f
+            newVz = newVz.coerceAtLeast(0f)
+            // Ground friction
+            newVx *= 0.85f
+            newVy *= 0.85f
         }
 
         // Altitude limit

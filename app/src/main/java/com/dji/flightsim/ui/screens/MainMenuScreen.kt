@@ -24,7 +24,8 @@ import com.dji.flightsim.ui.theme.DJIColors
 @Composable
 fun MainMenuScreen(
     onStartFreeFlight: () -> Unit,
-    onStartTraining: () -> Unit
+    onStartTraining: () -> Unit,
+    onStartFigure8: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -79,6 +80,12 @@ fun MainMenuScreen(
                     title = "Training",
                     description = "Follow waypoints to\npractice navigation",
                     onClick = onStartTraining
+                )
+                MenuCard(
+                    icon = Icons.Filled.AllInclusive,
+                    title = "Figure 8",
+                    description = "Fly a figure-8 pattern\nto master turning",
+                    onClick = onStartFigure8
                 )
             }
 

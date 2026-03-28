@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Screen {
-    MENU, FREE_FLIGHT, TRAINING
+    MENU, FREE_FLIGHT, TRAINING, FIGURE_8
 }
 
 @Composable
@@ -42,7 +42,8 @@ fun DJIFlightSimApp() {
         Screen.MENU -> {
             MainMenuScreen(
                 onStartFreeFlight = { currentScreen = Screen.FREE_FLIGHT },
-                onStartTraining = { currentScreen = Screen.TRAINING }
+                onStartTraining = { currentScreen = Screen.TRAINING },
+                onStartFigure8 = { currentScreen = Screen.FIGURE_8 }
             )
         }
         Screen.FREE_FLIGHT -> {
@@ -54,6 +55,13 @@ fun DJIFlightSimApp() {
         Screen.TRAINING -> {
             FlightScreen(
                 isTrainingMode = true,
+                onBack = { currentScreen = Screen.MENU }
+            )
+        }
+        Screen.FIGURE_8 -> {
+            FlightScreen(
+                isTrainingMode = true,
+                isFigure8Mode = true,
                 onBack = { currentScreen = Screen.MENU }
             )
         }

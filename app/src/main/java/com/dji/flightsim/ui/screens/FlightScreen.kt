@@ -27,12 +27,16 @@ import kotlinx.coroutines.delay
 @Composable
 fun FlightScreen(
     isTrainingMode: Boolean,
+    isFigure8Mode: Boolean = false,
     onBack: () -> Unit
 ) {
     val physicsEngine = remember { FlightPhysicsEngine() }
     val terrain = remember {
-        if (isTrainingMode) TerrainMap.createTrainingCourse()
-        else TerrainMap()
+        when {
+            isFigure8Mode -> TerrainMap.createFigure8Course()
+            isTrainingMode -> TerrainMap.createTrainingCourse()
+            else -> TerrainMap()
+        }
     }
 
     var droneState by remember { mutableStateOf(DroneState()) }

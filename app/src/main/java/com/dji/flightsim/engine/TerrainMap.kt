@@ -83,6 +83,48 @@ class TerrainMap(
             )
             return TerrainMap(waypoints = waypoints)
         }
+
+        fun createFigure8Course(): TerrainMap {
+            // Figure-8 pattern: two circles connected at center
+            // Right circle (clockwise), then left circle (counter-clockwise)
+            val radius = 60f
+            val centerY = 0f
+            val rightCenterX = radius
+            val leftCenterX = -radius
+            val alt = 30f
+            val numPointsPerCircle = 8
+
+            val waypoints = mutableListOf<Waypoint>()
+
+            // Start point at center crossing
+            waypoints.add(Waypoint(0f, 0f, alt))
+
+            // Right circle (clockwise: 0 -> -90 -> -180 -> -270)
+            for (i in 1..numPointsPerCircle) {
+                val angle = -2.0 * Math.PI * i / numPointsPerCircle
+                val wx = rightCenterX + radius * kotlin.math.sin(angle).toFloat()
+                val wy = centerY + radius * (1f - kotlin.math.cos(angle).toFloat())
+                waypoints.add(Waypoint(wx, wy, alt))
+            }
+
+            // Left circle (counter-clockwise: 0 -> 90 -> 180 -> 270)
+            for (i in 1..numPointsPerCircle) {
+                val angle = 2.0 * Math.PI * i / numPointsPerCircle
+                val wx = leftCenterX + radius * kotlin.math.sin(angle).toFloat()
+                val wy = centerY + radius * (1f - kotlin.math.cos(angle).toFloat())
+                waypoints.add(Waypoint(wx, wy, alt))
+            }
+
+            // Return home
+            waypoints.add(Waypoint(0f, 0f, 5f))
+
+            // Minimal obstacles for figure-8 course (just the landing pad)
+            val obstacles = listOf(
+                Obstacle(x = 0f, y = 0f, radius = 2f, height = 0.1f, type = ObstacleType.LANDING_PAD)
+            )
+
+            return TerrainMap(obstacles = obstacles, waypoints = waypoints)
+        }
     }
 
     fun checkCollision(state: DroneState): Obstacle? {

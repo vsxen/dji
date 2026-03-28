@@ -211,22 +211,22 @@ fun FlightMapView(
         // --- Drone ---
         val dronePos = worldToScreen(droneState.x, droneState.y)
         val headingRad = Math.toRadians(droneState.heading.toDouble()).toFloat()
-        val droneSize = 12f
+        val droneSize = 22f
 
         // Shadow
         drawCircle(
             color = Color.Black.copy(alpha = 0.3f),
-            radius = droneSize + 2f,
-            center = Offset(dronePos.x + 3f, dronePos.y + 3f)
+            radius = droneSize + 3f,
+            center = Offset(dronePos.x + 4f, dronePos.y + 4f)
         )
 
         // Drone body
         rotate(degrees = droneState.heading, pivot = dronePos) {
             // Arms
-            val armLength = droneSize * 1.2f
+            val armLength = droneSize * 1.1f
             val armColor = DJIColors.DroneStroke
-            drawLine(armColor, Offset(dronePos.x - armLength, dronePos.y - armLength), Offset(dronePos.x + armLength, dronePos.y + armLength), strokeWidth = 2.5f)
-            drawLine(armColor, Offset(dronePos.x + armLength, dronePos.y - armLength), Offset(dronePos.x - armLength, dronePos.y + armLength), strokeWidth = 2.5f)
+            drawLine(armColor, Offset(dronePos.x - armLength, dronePos.y - armLength), Offset(dronePos.x + armLength, dronePos.y + armLength), strokeWidth = 3f)
+            drawLine(armColor, Offset(dronePos.x + armLength, dronePos.y - armLength), Offset(dronePos.x - armLength, dronePos.y + armLength), strokeWidth = 3f)
 
             // Motors
             val motorPositions = listOf(
@@ -236,19 +236,20 @@ fun FlightMapView(
                 Offset(dronePos.x + armLength, dronePos.y + armLength)
             )
             for (mPos in motorPositions) {
-                drawCircle(DJIColors.DroneFill.copy(alpha = 0.3f), radius = 5f, center = mPos)
-                drawCircle(DJIColors.DroneFill, radius = 3f, center = mPos)
+                drawCircle(DJIColors.DroneFill.copy(alpha = 0.3f), radius = 8f, center = mPos)
+                drawCircle(DJIColors.DroneFill, radius = 5f, center = mPos)
             }
 
             // Center body
-            drawCircle(DJIColors.DroneFill, radius = droneSize * 0.4f, center = dronePos)
+            drawCircle(DJIColors.DroneFill, radius = droneSize * 0.35f, center = dronePos)
+            drawCircle(DJIColors.DroneStroke, radius = droneSize * 0.35f, center = dronePos, style = Stroke(width = 1.5f))
 
-            // Forward direction indicator
+            // Forward direction indicator (red nose)
             drawLine(
                 color = DJIColors.Danger,
                 start = dronePos,
-                end = Offset(dronePos.x, dronePos.y - droneSize * 1.5f),
-                strokeWidth = 3f,
+                end = Offset(dronePos.x, dronePos.y - droneSize * 1.4f),
+                strokeWidth = 3.5f,
                 cap = StrokeCap.Round
             )
         }
