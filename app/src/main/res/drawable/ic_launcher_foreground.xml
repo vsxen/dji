@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Drone body -->
+    <path
+        android:fillColor="#00D4FF"
+        android:pathData="M54,44 L64,54 L54,64 L44,54 Z"/>
+    <!-- Arms -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M44,44 L64,64 M64,44 L44,64"/>
+    <!-- Motors -->
+    <path
+        android:fillColor="#00D4FF"
+        android:pathData="M42,42 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0
+                         M60,42 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0
+                         M42,60 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0
+                         M60,60 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
+    <!-- Forward indicator -->
+    <path
+        android:strokeColor="#FF3333"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,44 L54,36"/>
+</vector>
