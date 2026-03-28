@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- DJI controllers - Vendor ID 0x2CA3 = 11427 -->
-    <usb-device vendor-id="11427" />
-    <!-- DJI FPV controller alternate VID -->
-    <usb-device vendor-id="9558" />
-</resources>
