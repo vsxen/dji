@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dji_dark">#FF1A1A2E</color>
+    <color name="dji_accent">#FF00D4FF</color>
+    <color name="dji_warning">#FFFF6B35</color>
+    <color name="dji_danger">#FFFF3333</color>
+    <color name="dji_success">#FF00E676</color>
+    <color name="dji_text">#FFFFFFFF</color>
+    <color name="dji_text_dim">#99FFFFFF</color>
+</resources>
