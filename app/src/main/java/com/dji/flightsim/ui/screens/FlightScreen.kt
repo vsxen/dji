@@ -28,6 +28,8 @@ import kotlinx.coroutines.delay
 fun FlightScreen(
     isTrainingMode: Boolean,
     isFigure8Mode: Boolean = false,
+    gamepadState: GamepadInputHandler.GamepadState = GamepadInputHandler.GamepadState(),
+    onSetGamepadCallbacks: ((motorToggle: () -> Unit, pause: () -> Unit) -> Unit)? = null,
     onBack: () -> Unit
 ) {
     val physicsEngine = remember { FlightPhysicsEngine() }
@@ -40,7 +42,12 @@ fun FlightScreen(
     }
 
     var droneState by remember { mutableStateOf(DroneState()) }
-    var controlInput by remember { mutableStateOf(ControlInput()) }
+    // Separate state for each stick to avoid race conditions
+    var leftStickX by remember { mutableFloatStateOf(0f) }
+    var leftStickY by remember { mutableFloatStateOf(0f) }
+    var rightStickX by remember { mutableFloatStateOf(0f) }
+    var rightStickY by remember { mutableFloatStateOf(0f) }
+
     var trail by remember { mutableStateOf(listOf<Offset>()) }
     var isCollision by remember { mutableStateOf(false) }
     var collisionCooldown by remember { mutableFloatStateOf(0f) }
@@ -48,6 +55,14 @@ fun FlightScreen(
     var showCrashDialog by remember { mutableStateOf(false) }
     var showCompleteDialog by remember { mutableStateOf(false) }
     var isPaused by remember { mutableStateOf(false) }
+
+    // Register gamepad button callbacks
+    LaunchedEffect(Unit) {
+        onSetGamepadCallbacks?.invoke(
+            { droneState = droneState.copy(motorsRunning = !droneState.motorsRunning) },
+            { isPaused = !isPaused }
+        )
+    }
 
     // Game loop
     LaunchedEffect(isPaused) {
@@ -62,8 +77,16 @@ fun FlightScreen(
 
             if (showCrashDialog || showCompleteDialog) continue
 
+            // Merge touch + gamepad input (take whichever has larger magnitude)
+            val mergedInput = ControlInput(
+                yaw = if (kotlin.math.abs(gamepadState.leftX) > kotlin.math.abs(leftStickX)) gamepadState.leftX else leftStickX,
+                throttle = if (kotlin.math.abs(gamepadState.leftY) > kotlin.math.abs(leftStickY)) gamepadState.leftY else leftStickY,
+                roll = if (kotlin.math.abs(gamepadState.rightX) > kotlin.math.abs(rightStickX)) gamepadState.rightX else rightStickX,
+                pitch = if (kotlin.math.abs(gamepadState.rightY) > kotlin.math.abs(rightStickY)) gamepadState.rightY else rightStickY
+            )
+
             // Update physics
-            val newState = physicsEngine.update(droneState, controlInput, dt)
+            val newState = physicsEngine.update(droneState, mergedInput, dt)
 
             // Collision detection
             val collision = terrain.checkCollision(newState)
@@ -144,7 +167,8 @@ fun FlightScreen(
         ) {
             VirtualJoystick(
                 onValueChange = { x, y ->
-                    controlInput = controlInput.copy(yaw = x, throttle = y)
+                    leftStickX = x
+                    leftStickY = y
                 }
             )
         }
@@ -157,16 +181,19 @@ fun FlightScreen(
         ) {
             VirtualJoystick(
                 onValueChange = { x, y ->
-                    controlInput = controlInput.copy(roll = x, pitch = y)
+                    rightStickX = x
+                    rightStickY = y
                 }
             )
         }
 
-        // Motor toggle button
-        Box(
+        // Motor toggle button + gamepad indicator
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
+                .padding(bottom = 32.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             MotorButton(
                 isRunning = droneState.motorsRunning,
@@ -174,6 +201,33 @@ fun FlightScreen(
                     droneState = droneState.copy(motorsRunning = !droneState.motorsRunning)
                 }
             )
+            if (gamepadState.connected) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DJIColors.Success.copy(alpha = 0.2f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Gamepad,
+                            contentDescription = null,
+                            tint = DJIColors.Success,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "RC",
+                            color = DJIColors.Success,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
 
         // Back button
@@ -245,7 +299,8 @@ fun FlightScreen(
                 titleColor = DJIColors.Danger,
                 onAction = {
                     droneState = DroneState()
-                    controlInput = ControlInput()
+                    leftStickX = 0f; leftStickY = 0f
+                    rightStickX = 0f; rightStickY = 0f
                     trail = emptyList()
                     currentWaypointIndex = 0
                     showCrashDialog = false
@@ -266,7 +321,8 @@ fun FlightScreen(
                 titleColor = DJIColors.Success,
                 onAction = {
                     droneState = DroneState()
-                    controlInput = ControlInput()
+                    leftStickX = 0f; leftStickY = 0f
+                    rightStickX = 0f; rightStickY = 0f
                     trail = emptyList()
                     currentWaypointIndex = 0
                     showCompleteDialog = false
